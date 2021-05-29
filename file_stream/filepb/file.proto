@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package file_stream;
+option go_package="./file_stram/filepb";
+
+message UploadFileRequest {
+    oneof data {
+        FileInfo info = 1;
+        bytes chunk_data = 2;
+    }
+}
+
+message FileInfo{
+    string file_id = 1;
+    string file_type = 2;
+}
+
+message UploadFileResponse{
+    string id = 1;
+    uint32 size = 2;
+}
+
+service FileService{
+    rpc UploadFile (stream UploadFileRequest) returns (UploadFileResponse);
+}
