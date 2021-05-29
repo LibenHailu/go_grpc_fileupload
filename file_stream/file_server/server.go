@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 
 	"github.com/LibenHailu/grpc_file_stream/file_stream/filepb"
 	"github.com/LibenHailu/grpc_file_stream/file_stream/service"
@@ -28,6 +29,37 @@ func NewServer(fileStore service.FileStore) *server {
 		fileStore: fileStore,
 	}
 }
+
+func (s *server) DownloadFile(req *filepb.ServeFileRequest, res filepb.FileService_DownloadFileServer) error {
+	bufferSize := 64 * 1024 //64KiB, tweak this as desired
+	file, err := os.Open("../file/" + req.GetFileName())
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer file.Close()
+	buff := make([]byte, bufferSize)
+	for {
+		bytesRead, err := file.Read(buff)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println(err)
+			}
+			break
+		}
+		resp := &filepb.ServeFileResponse{
+			ChunkData: buff[:bytesRead],
+		}
+		err = res.Send(resp)
+		if err != nil {
+			log.Println("error while sending chunk:", err)
+			return err
+		}
+
+	}
+	return nil
+}
+
 func (s *server) UploadFile(stream filepb.FileService_UploadFileServer) error {
 	req, err := stream.Recv()
 	if err != nil {
@@ -37,6 +69,7 @@ func (s *server) UploadFile(stream filepb.FileService_UploadFileServer) error {
 
 	fileID := req.GetInfo().GetFileId()
 	fileType := req.GetInfo().GetFileType()
+	fileName := req.GetInfo().GetFileName()
 
 	log.Println("recived an upload file with id %s with type %s", fileID, fileType)
 
@@ -70,7 +103,7 @@ func (s *server) UploadFile(stream filepb.FileService_UploadFileServer) error {
 		}
 	}
 
-	result, err := s.fileStore.Save(fileID, fileType, fileData)
+	result, err := s.fileStore.Save(fileID, fileType, fileData, fileName)
 
 	if err != nil {
 		return logError(status.Errorf(codes.Internal, "couldn't save file: %v", err))

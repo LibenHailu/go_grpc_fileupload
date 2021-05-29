@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	myFilePath "path/filepath"
 
 	"github.com/LibenHailu/grpc_file_stream/file_stream/filepb"
+	"github.com/LibenHailu/grpc_file_stream/file_stream/service/client"
 	"google.golang.org/grpc"
 )
 
@@ -25,7 +27,8 @@ func main() {
 
 	c := filepb.NewFileServiceClient(cc)
 
-	UploadFile(c, "a", "C:/Users/Liben/Desktop/Liben.jpg")
+	// UploadFile(c, "bini", "C:/Users/Liben/Desktop/Liben.jpg")
+	DownloadFile(c, "Liben.jpg")
 
 }
 
@@ -44,11 +47,18 @@ func UploadFile(c filepb.FileServiceClient, fileID string, filepath string) {
 		log.Fatalf("couldn't upload file %v", err)
 	}
 
+	fileStat, err := os.Stat(filepath)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	req := &filepb.UploadFileRequest{
 		Data: &filepb.UploadFileRequest_Info{
 			Info: &filepb.FileInfo{
 				FileId:   fileID,
 				FileType: myFilePath.Ext(filepath),
+				FileName: fileStat.Name(),
 			},
 		},
 	}
@@ -92,19 +102,45 @@ func UploadFile(c filepb.FileServiceClient, fileID string, filepath string) {
 	log.Printf("file uploaded with id: %s, size: %d", res.GetId(), res.GetSize())
 }
 
-// func doUnary(c greetpb.GreetServiceClient) {
+func DownloadFile(c filepb.FileServiceClient, fileName string) {
+	req := &filepb.ServeFileRequest{
+		FileName: fileName,
+	}
+	resStream, err := c.DownloadFile(context.Background(), req)
+	if err != nil {
+		log.Fatalf("error downloading file: %v", err)
+	}
+	fileData := bytes.Buffer{}
+	fileSize := 0
+	for {
+		msg, err := resStream.Recv()
 
-// 	req := &greetpb.GreetRequest{
-// 		Greeting: &greetpb.Greeting{
-// 			FirstName: "Liben",
-// 			LastName:  "Hailu",
-// 		},
-// 	}
-// 	res, err := c.Greet(context.Background(), req)
+		if err == io.EOF {
+			// we've reached the end of stream
+			log.Println("recived all chunks")
+			break
+		}
+		if err != nil {
+			log.Fatalf("error while reciving chunk %v", err)
+		}
+		log.Printf("Response from GreetManyTimes: %v ", msg.ChunkData)
+		chunk := msg.GetChunkData()
+		size := len(chunk)
 
-// 	if err != nil {
-// 		log.Fatalf("error while calling Greet RPC: %v", err)
-// 	}
+		fileSize += size
 
-// 	log.Printf("Response form Great: %v", res.Result)
-// }
+		// if fileSize > maxFileSize {
+		// 	return logError(status.Errorf(codes.InvalidArgument, "file is too large: %d > %d", fileSize, maxFileSize))
+		// }
+
+		_, err = fileData.Write(chunk)
+		if err != nil {
+			log.Fatal("couldn't write chunk data: %v", err)
+		}
+
+	}
+
+	clientSave := client.NewDiskFileStore("C:/Users/Liben/Desktop/dsp")
+	clientSave.Save(fileData, fileName)
+
+}

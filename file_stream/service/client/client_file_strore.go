@@ -1,4 +1,4 @@
-package service
+package client
 
 import (
 	"bytes"
@@ -16,25 +16,23 @@ type FileStore interface {
 type DiskFileStore struct {
 	mutex      sync.RWMutex
 	fileFolder string
-	files      map[string]*FileInfo
+	// files      map[string]*FileInfo
 }
 
 type FileInfo struct {
-	FileID string
-	Type   string
-	Path   string
+	Path string
 }
 
 // returns a new DiskFileStore
 func NewDiskFileStore(fileFolder string) *DiskFileStore {
 	return &DiskFileStore{
 		fileFolder: fileFolder,
-		files:      make(map[string]*FileInfo),
+		// files:      make(map[string]*FileInfo),
 	}
 }
 
 //  Save saves a new file to the store
-func (store *DiskFileStore) Save(fileId string, fileType string, fileData bytes.Buffer, fileName string) (string, error) {
+func (store *DiskFileStore) Save(fileData bytes.Buffer, fileName string) (string, error) {
 
 	// hashId, err := uuid.NewRandom()
 	// fileId = hashId.String()
@@ -43,7 +41,6 @@ func (store *DiskFileStore) Save(fileId string, fileType string, fileData bytes.
 	// 	return "", fmt.Errorf("couldn't generate file id: %v", err)
 	// }
 
-	fmt.Println(fileId)
 	filepath := fmt.Sprintf("%s/%s", store.fileFolder, fileName)
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -58,11 +55,9 @@ func (store *DiskFileStore) Save(fileId string, fileType string, fileData bytes.
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
 
-	store.files[fileId] = &FileInfo{
-		FileID: fileId,
-		Type:   fileType,
-		Path:   filepath,
-	}
-
-	return fileId, nil
+	// store.files[fileId] = &FileInfo{
+	// 	Path: filepath,
+	// }
+	fmt.Println(filepath)
+	return filepath, nil
 }
