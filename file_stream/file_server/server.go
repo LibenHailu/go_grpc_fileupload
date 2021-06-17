@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
 
+	filesource "github.com/LibenHailu/grpc_file_stream/file_stream/file_source"
 	"github.com/LibenHailu/grpc_file_stream/file_stream/filepb"
 	"github.com/LibenHailu/grpc_file_stream/file_stream/service"
 	"google.golang.org/grpc"
@@ -28,6 +30,21 @@ func NewServer(fileStore service.FileStore) *server {
 	return &server{
 		fileStore: fileStore,
 	}
+}
+func (s *server) RegisterPeers(ctx context.Context, req *filepb.RegisterPeersRequest) (*filepb.RegisterPeersResponse, error) {
+
+	fmt.Println("reciving address")
+	ip := req.Ip
+	port := req.Port
+	fileNames := req.FileNames
+
+	filesource.AddToSources(fmt.Sprintf("%s:%d", ip, port), fileNames)
+
+	res := &filepb.RegisterPeersResponse{
+		ServerAddress: fmt.Sprintf("%s:%d", ip, port),
+	}
+
+	return res, nil
 }
 
 func (s *server) DownloadFile(req *filepb.ServeFileRequest, res filepb.FileService_DownloadFileServer) error {

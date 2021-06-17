@@ -1,7 +1,8 @@
-package main
+package fileclient
 
 import (
 	"bufio"
+	"net/http"
 	"bytes"
 	"context"
 	"fmt"
@@ -10,12 +11,31 @@ import (
 	"os"
 	myFilePath "path/filepath"
 
+	filesource "github.com/LibenHailu/grpc_file_stream/file_stream/file_source"
 	"github.com/LibenHailu/grpc_file_stream/file_stream/filepb"
 	"github.com/LibenHailu/grpc_file_stream/file_stream/service/client"
 	"google.golang.org/grpc"
+	"github.com/gin-gonic/gin"
 )
 
+var (
+	c filepb.FileServiceClient
+)
+
+func Connect() *grpc.ClientConn {
+	cc, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+
+	if err != nil {
+		log.Fatalf("could not found connect %v ", err)
+	}
+
+	defer cc.Close()
+
+	return cc
+}
+
 func main() {
+
 	fmt.Println("Hello i am file stream client")
 	cc, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
 
@@ -25,13 +45,37 @@ func main() {
 
 	defer cc.Close()
 
-	c := filepb.NewFileServiceClient(cc)
+	c = filepb.NewFileServiceClient(cc)
 
 	// UploadFile(c, "bini", "C:/Users/Liben/Desktop/Liben.jpg")
-	DownloadFile(c, "Liben.jpg")
-
+	// DownloadFile(c, "Liben.jpg")
+	fileNames := []string{"sdf", "asdf"}
+	RegisterPeers(c, "as", 253, fileNames)
 }
 
+func UploadFileClient(c *gin.Context) {
+	// file, header , err := c.Request.FormFile("file")
+	// filename := header.Filename
+	// fmt.Println(header.Filename)
+	// fileExt := myFilePath.Ext(filename)
+	// out, err := os.Create("C:/Users/Liben/go/src/github.com/LibenHailu/grpc_file_stream/file_stream/file"+filename+fileExt)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer out.Close()
+	// _, err = io.Copy(out, file)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }   
+	file, _ := c.FormFile("file")
+	log.Println(file.Filename)
+
+	if err := c.SaveUploadedFile(file, "C:/Users/Liben/go/src/github.com/LibenHailu/grpc_file_stream/file_stream/file/"+file.Filename); err != nil {
+		c.String(http.StatusBadRequest, "Save failed Error:%s", err.Error())
+		return
+	}
+	c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
+}
 func UploadFile(c filepb.FileServiceClient, fileID string, filepath string) {
 	file, err := os.Open(filepath)
 
@@ -143,4 +187,22 @@ func DownloadFile(c filepb.FileServiceClient, fileName string) {
 	clientSave := client.NewDiskFileStore("C:/Users/Liben/Desktop/dsp")
 	clientSave.Save(fileData, fileName)
 
+}
+
+func RegisterPeers(c filepb.FileServiceClient, ip string, port int32, fileNames []string) {
+	filesource.SearchAddressForThefile("Liben")
+	// myPort, _ := strconv.Atoi(port)
+	req := &filepb.RegisterPeersRequest{
+		Ip:        ip,
+		Port:      port,
+		FileNames: fileNames,
+	}
+
+	res, err := c.RegisterPeers(context.Background(), req)
+
+	if err != nil {
+		log.Fatalf("error while calling Register Peers RPC: %v", err)
+	}
+
+	log.Printf("Response form Sum: %v", res.ServerAddress)
 }

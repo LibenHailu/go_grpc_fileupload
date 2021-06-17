@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.1.0
 // - protoc             v3.17.1
-// source: file_stream/filepb/file.proto
+// source: filepb/file.proto
 
 package filepb
 
@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type FileServiceClient interface {
 	UploadFile(ctx context.Context, opts ...grpc.CallOption) (FileService_UploadFileClient, error)
 	DownloadFile(ctx context.Context, in *ServeFileRequest, opts ...grpc.CallOption) (FileService_DownloadFileClient, error)
+	RegisterPeers(ctx context.Context, in *RegisterPeersRequest, opts ...grpc.CallOption) (*RegisterPeersResponse, error)
 }
 
 type fileServiceClient struct {
@@ -100,12 +101,22 @@ func (x *fileServiceDownloadFileClient) Recv() (*ServeFileResponse, error) {
 	return m, nil
 }
 
+func (c *fileServiceClient) RegisterPeers(ctx context.Context, in *RegisterPeersRequest, opts ...grpc.CallOption) (*RegisterPeersResponse, error) {
+	out := new(RegisterPeersResponse)
+	err := c.cc.Invoke(ctx, "/file_stream.FileService/RegisterPeers", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FileServiceServer is the server API for FileService service.
 // All implementations must embed UnimplementedFileServiceServer
 // for forward compatibility
 type FileServiceServer interface {
 	UploadFile(FileService_UploadFileServer) error
 	DownloadFile(*ServeFileRequest, FileService_DownloadFileServer) error
+	RegisterPeers(context.Context, *RegisterPeersRequest) (*RegisterPeersResponse, error)
 	mustEmbedUnimplementedFileServiceServer()
 }
 
@@ -118,6 +129,9 @@ func (UnimplementedFileServiceServer) UploadFile(FileService_UploadFileServer) e
 }
 func (UnimplementedFileServiceServer) DownloadFile(*ServeFileRequest, FileService_DownloadFileServer) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadFile not implemented")
+}
+func (UnimplementedFileServiceServer) RegisterPeers(context.Context, *RegisterPeersRequest) (*RegisterPeersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterPeers not implemented")
 }
 func (UnimplementedFileServiceServer) mustEmbedUnimplementedFileServiceServer() {}
 
@@ -179,13 +193,36 @@ func (x *fileServiceDownloadFileServer) Send(m *ServeFileResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _FileService_RegisterPeers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterPeersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServiceServer).RegisterPeers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/file_stream.FileService/RegisterPeers",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServiceServer).RegisterPeers(ctx, req.(*RegisterPeersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FileService_ServiceDesc is the grpc.ServiceDesc for FileService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var FileService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "file_stream.FileService",
 	HandlerType: (*FileServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterPeers",
+			Handler:    _FileService_RegisterPeers_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "UploadFile",
@@ -198,5 +235,5 @@ var FileService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "file_stream/filepb/file.proto",
+	Metadata: "filepb/file.proto",
 }
